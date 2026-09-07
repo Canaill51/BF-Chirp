@@ -1,35 +1,42 @@
 # What the firmware actually does
 
-Verified against `src/main/flight/chirp.c` and `pid.c` in Betaflight, and
-against real logs. [PR #13105][pr] is the reference.
+What real logs confirm, over and above what the source says. The upstream
+source itself — the generator, the parameters, the debug channel scalings — is
+documented in [reference/chirp-firmware.md](reference/chirp-firmware.md),
+pinned to a commit. This page holds the things source code alone cannot
+settle: whether the logged signal is what you think it is, and what the craft
+actually did.
+
+Verified against `src/main/common/chirp.c` and `src/main/flight/pid.c` in
+Betaflight, and against real logs. [PR #13105][pr] is the reference.
 
 [pr]: https://github.com/betaflight/betaflight/pull/13105
 
 ## The debug channels
 
-With `debug_mode = CHIRP`:
+The channel map and its scalings are firmware facts, documented with their
+source in
+[reference/chirp-firmware.md](reference/chirp-firmware.md#debug-channels-debug_mode--chirp).
+Two of them shape how `bfchirp` reads a log:
 
-| Channel | Contents | Scaling |
-|---|---|---|
-| `debug[0]` | sweep phase argument | `5000 × sinarg` |
-| `debug[1]` | excited axis, `-1` when idle | raw axis index |
-| `debug[2]` | instantaneous frequency | `10 × f`, i.e. **deci-Hz** |
-| `debug[3]` | normalised excitation | `1000 × chirp` |
+**`debug[2]` is in deci-Hz**, and so are the
+`chirp_frequency_start_deci_hz` / `chirp_frequency_end_deci_hz` header keys.
+Reading either as Hz puts every frequency out by a factor of ten.
 
-The deci-Hz scaling on `debug[2]` matters twice over: it is also how
-`chirp_frequency_start_deci_hz` and `chirp_frequency_end_deci_hz` are stored in
-the header. Reading either as Hz puts every frequency out by a factor of ten.
-
-`debug[2]` is zero whenever no sweep is running, which is what `bfchirp` uses
-to segment the log — the header alone cannot tell you a sweep was actually
-flown.
+**`debug[2]` is zero whenever no sweep is running**, which is what `bfchirp`
+segments on. The header cannot substitute: it records what was configured, not
+whether a sweep was ever flown — and a log may contain any number of them,
+across any subset of the three axes.
 
 ## Is the chirp inside the logged setpoint?
 
 Everything rests on this. If the setpoint were captured *before* the sweep was
 added, `gyro / setpoint` would measure nothing real.
 
-It is inside. Measured on an Air65 log:
+The firmware settles the first half: `pid.c` adds the excitation straight into
+the setpoint variable, `currentPidSetpoint += currentChirp`. What source alone
+cannot settle is whether the value the blackbox *logs* is sampled after that
+addition. Measurement on an Air65 log says it is:
 
 ```
 correlation setpoint vs debug[3]    Roll +0.78   Pitch +0.79   Yaw +0.77
@@ -53,7 +60,11 @@ nominal 230, identically on all three axes.
    `chirp_lag_freq_hz` and `chirp_lead_freq_hz` (3 Hz and 30 Hz by default),
    so above the zero the amplitude floors at their ratio — 10 % of nominal.
 
-Measured on a stock 0.2 → 15 Hz sweep:
+Note that `debug[3]` is logged *before* the compensator and before the
+amplitude scaling, so it cannot be used to reconstruct what was injected — see
+[reference/chirp-firmware.md](reference/chirp-firmware.md#the-signal-path-into-the-setpoint).
+
+Measured on a 0.2 → 15 Hz sweep:
 
 | f (Hz) | injected | % of nominal |
 |---|---|---|
