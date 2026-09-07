@@ -273,8 +273,11 @@ def _report_motor_load(result: ChirpResult, out) -> None:
     out("    ripple, so the low end of the sweep is its most demanding part.")
     if load.get("feedforward_active"):
         out("    ! FEEDFORWARD WAS ACTIVE during this sweep. Its output grows with")
-        out("      frequency and the lead/lag does not bound it — set ff_weight to 0")
-        out("      before widening the sweep.")
+        out("      frequency and the lead/lag does not bound it. Zero the F terms")
+        # ff_weight is the blackbox header key, not a CLI setting: the settings
+        # are the per-axis F gains. Naming the header key here sent people to a
+        # 'set' command that does not exist.
+        out("      (set f_roll / f_pitch / f_yaw = 0) before widening the sweep.")
     else:
         out("    feedforward is off: the precondition for widening the sweep is met.")
     out("")
