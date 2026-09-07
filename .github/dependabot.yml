@@ -1,0 +1,43 @@
+# Two surfaces can go stale here: the actions pinned in .github/workflows/ and
+# the Python dependencies in pyproject.toml. Both move on someone else's
+# schedule, so check on a timer rather than waiting for a build to break.
+version: 2
+
+updates:
+  # The workflows pin majors (actions/checkout@v5), which float within a major
+  # but never across one. A major bump is exactly the change that needs a human
+  # to read the release notes, so this is where dependabot earns its keep.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Etc/UTC"
+    # An hour after the upstream-drift run, so the two do not land together.
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the lot: these are read together and merged together.
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+
+  # pyproject.toml declares floors (numpy>=1.24), not pins, and there is no
+  # lockfile — so a new numpy is already allowed and dependabot has nothing to
+  # raise. It stays here for the case that does bite: a security advisory
+  # against a version the floor still permits, which arrives as an alert
+  # regardless of the schedule below.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    groups:
+      python:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps"
