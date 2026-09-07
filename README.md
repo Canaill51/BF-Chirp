@@ -167,4 +167,5 @@ flight data and the assertions have a ground truth to check against.
 
 ## Licence
 
-MIT.
+GNU General Public License v3.0 or later, the same licence Betaflight uses.
+See [LICENSE](LICENSE).
