@@ -48,3 +48,21 @@ jobs:
       # formatting check here would only report noise. See AGENTS.md.
       - name: Run tests
         run: python -m pytest
+
+  # One stable context for the branch rule to require. Requiring the matrix
+  # jobs directly would mean editing the rule every time a Python version is
+  # added or dropped — and a rule that names a job which no longer exists
+  # blocks every PR until someone notices.
+  tests:
+    name: tests
+    needs: test
+    if: always() # so a failed or cancelled matrix still reports, rather than skipping
+    runs-on: ubuntu-latest
+    steps:
+      # A skipped job is not a passing one: check the result explicitly rather
+      # than letting `needs` succeed by default.
+      - name: Check matrix result
+        if: needs.test.result != 'success'
+        run: |
+          echo "matrix result: ${{ needs.test.result }}"
+          exit 1
