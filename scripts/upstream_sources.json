@@ -1,0 +1,49 @@
+{
+  "_comment": [
+    "Pinned upstream sources that bfchirp's reference documentation is derived from.",
+    "This file is the single source of truth for the pins; docs/reference/SOURCES.md",
+    "renders it for humans via `python scripts/fetch_upstream.py --list`.",
+    "Nothing listed here is committed to this repository. Not a licence",
+    "matter -- bfchirp is GPL-3.0-or-later too -- but a staleness one.",
+    "See docs/reference/README.md."
+  ],
+  "repos": {
+    "betaflight": {
+      "url": "https://github.com/betaflight/betaflight",
+      "license": "GPL-3.0",
+      "commit": "61b2c9f6d98d7108d931289614e60b1947c2b0c6",
+      "checked": "2026-09-08",
+      "files": [
+        "src/main/common/chirp.c",
+        "src/main/common/chirp.h",
+        "src/main/flight/pid.c",
+        "src/main/build/debug.c",
+        "src/main/build/debug.h",
+        "src/main/cli/settings.c",
+        "src/main/fc/parameter_names.h",
+        "src/main/blackbox/blackbox.c",
+        "src/main/blackbox/blackbox_fielddefs.h"
+      ]
+    },
+    "blackbox-tools": {
+      "url": "https://github.com/betaflight/blackbox-tools",
+      "license": "GPL-3.0",
+      "commit": "f832acf9cd9dbe5ad8220de1a5f4eb4021523d72",
+      "checked": "2026-09-08",
+      "files": [
+        "src/blackbox_decode.c",
+        "Readme.md"
+      ]
+    },
+    "betaflight.com": {
+      "url": "https://github.com/betaflight/betaflight.com",
+      "license": "unspecified",
+      "commit": "f05cf72c7f48555607c271c588577dd5a65c5fd1",
+      "checked": "2026-09-08",
+      "files": [
+        "docs/development/Blackbox-Internals.md",
+        "docs/development/debugging/Debug-Field-Annotations.md"
+      ]
+    }
+  }
+}

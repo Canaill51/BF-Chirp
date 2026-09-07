@@ -16,3 +16,6 @@ venv/
 out/
 *.png
 !docs/*.png
+
+# Upstream sources fetched by scripts/fetch_upstream.py, never committed
+vendor/
