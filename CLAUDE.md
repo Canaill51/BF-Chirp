@@ -1,44 +1,74 @@
 # Working on bfchirp
 
-Analysis of Betaflight blackbox logs. Read `README.md` first — its
-"Limitations worth knowing" section is the honest account of what these
-measurements can and cannot support, and `docs/firmware.md` records what was
-verified against the firmware source rather than assumed.
+Read [`AGENTS.md`](AGENTS.md) first — it is the canonical brief: commands, the
+analysis/rendering rule, the traps that have bitten before, and the conventions.
+This file adds only the orientation that saves you re-exploring the codebase.
 
-## Conventions
+## Module map
 
-* **English** throughout: code, comments, docs, CLI output.
-* Analysis and rendering stay separate. Modules in `noise.py`, `step.py` and
-  `chirp.py` return dataclasses of plain numbers; `report.py` is the only
-  place that formats. This is what lets `--json` exist without duplication.
-* Comments explain *why*, and especially why an obvious alternative is wrong.
-  Several of them mark real traps — deci-Hz scaling, eRPM conversion, the
-  four-motor mean — that already caused wrong answers once.
+Analysis modules return dataclasses; `report.py` formats. Nothing else formats.
 
-## Traps that have bitten before
+| Module | Role | Imports |
+|---|---|---|
+| [log.py](src/bfchirp/log.py) | Header parsing, lazy column access, unit conversion, flight mask | — |
+| [spectral.py](src/bfchirp/spectral.py) | Welch spectra, band RMS, peak finding, delay fit, phase margin | — |
+| [decode.py](src/bfchirp/decode.py) | Locates and runs `blackbox_decode`, one `FlightLog` per segment | `log` |
+| [noise.py](src/bfchirp/noise.py) | Raw vs filtered gyro per band, motor harmonics, D-term | `log`, `spectral` |
+| [step.py](src/bfchirp/step.py) | Wiener deconvolution of setpoint into gyro | `log` |
+| [chirp.py](src/bfchirp/chirp.py) | Sweep segmentation, transfer function, excitation and motor load | `log`, `spectral` |
+| [report.py](src/bfchirp/report.py) | Text rendering and `to_jsonable` | result types, `EDGE_HZ` |
+| [cli.py](src/bfchirp/cli.py) | Argument parsing, orchestration, exit codes | all of the above |
 
-* `debug[2]` and the `chirp_frequency_*_deci_hz` header keys are in
-  **deci-Hz**. Reading them as Hz puts everything out by ten.
-* eRPM is electrical RPM / 100, so mechanical RPM is `eRPM * 100 / (poles/2)`.
-* Use `log.motor_rpm(i)` — never the `log.rpm` mean — to measure the
-  oscillation a roll or pitch excitation causes. The mean cancels it.
-* `blackbox_decode` is called without `--unit-rotation`: converting units
-  changes `gyroADC` but not `gyroUnfilt`, and the two silently stop being
-  comparable.
-* Column names may or may not carry a unit suffix (`time` vs `time (us)`).
-  `FlightLog` registers both spellings; look columns up through it.
+`log.py` and `spectral.py` are leaves. `report.py` imports the result types
+only to render them — if it ever needs to compute, the computation is in the
+wrong place.
 
-## Tests
+Two things in `log.py` are worth knowing before touching anything:
+`FlightLog` reads only the header at construction and loads columns lazily on
+first access, and it registers both spellings of every column name.
 
-```sh
-pytest
+## CLI surface
+
+```
+bfchirp LOG [LOG ...] [--only noise,step,chirp] [--decoder PATH]
+             [--workdir DIR] [--json PATH] [--segment N]
 ```
 
-Fixtures in `tests/conftest.py` build synthetic logs with known contents — a
-tone that filtering removes, a sweep through a known 15 ms transport delay — so
-assertions have a ground truth. When you change an estimator, check it against
-that truth rather than against its previous output.
+`LOG` is a `.bbl`, a `.csv`, or a directory containing them. `--json -` writes
+to stdout and suppresses the text report so the two do not interleave.
 
-A real reference log (Air65, 21 sweeps) was used during development; its
-results are quoted in `README.md` and `docs/firmware.md`. Flight data is
-gitignored and lives outside the repo.
+Exit codes: `2` for a bad request or nothing analysable, `1` if there were
+failures *and* nothing was analysed, `0` otherwise.
+
+The chirp analysis is gated on `log.is_chirp` — a property of the data, not of
+the request. Asking for `--only chirp` on a plain flight log is not an error;
+it reports that there was no sweep. This is why the same command works for
+both kinds of log.
+
+## Key constants
+
+| Constant | Module | Meaning |
+|---|---|---|
+| `EDGE_HZ = 1.5` | `chirp.py` | Nothing below this is trustworthy |
+| `EDGE_FRACTION = 0.12` | `chirp.py` | A peak this close to the low edge is an artefact |
+| `FLAT_SPAN_DB = 1.0` | `chirp.py` | Peak-to-peak gain below this counts as flat |
+| `BAND_EDGES` | `noise.py` | 20/80/200/400/800/1200 Hz; bands past Nyquist are dropped |
+| `MIN_EXCITATION_DPS = 20.0` | `step.py` | Below this a window has no usable stick input |
+| `WIENER_LAMBDA = 0.02` | `step.py` | Deconvolution regularisation |
+
+`EDGE_HZ` is the one constant shared across the analysis/rendering boundary —
+`report.py` imports it to explain the band it is printing.
+
+## Verifying a change
+
+The checklist lives in [AGENTS.md](AGENTS.md#checking-your-work) — tests, then
+the upstream drift check, then style, then an honest report. Two practical
+notes on top of it:
+
+* `python scripts/fetch_upstream.py` (without `--check`) puts the real firmware
+  sources under `vendor/`, so a claim can be read rather than recalled.
+  [docs/reference/chirp-firmware.md](docs/reference/chirp-firmware.md) says
+  what they mean and which lines matter.
+* The drift check needs network. If it cannot run, say so rather than
+  presenting a firmware claim as verified — the pin is a statement about a
+  specific commit, and an unchecked pin is just a date.

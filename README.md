@@ -64,8 +64,9 @@ point: it separates how much noise the craft produces from how much the filter
 chain removes, which is what tells you whether there is room to filter less and
 buy back latency. Also reports D-term noise and what actually reaches the ESCs.
 
-Needs `debug_mode = GYRO_SCALED` (or any mode logging `gyroUnfilt`) for the raw
-trace, and bidirectional DShot for the harmonics.
+Needs `gyroUnfilt` logged for the raw trace — on current firmware that is
+`set blackbox_disable_gyrounfilt = OFF`, not a debug mode — and bidirectional
+DShot for the harmonics. See [docs/recording.md](docs/recording.md).
 
 ### Step response
 
@@ -144,13 +145,33 @@ so its output grows with frequency and the lead/lag does not bound it.
 ## Development
 
 ```sh
-pip install -e ".[dev]"
-pytest
+uv venv .venv && uv pip install --python .venv/bin/python -e ".[dev]"
+.venv/bin/python -m pytest
 ```
+
+(or `pip install -e ".[dev]"` inside an activated virtualenv — on a current
+Ubuntu the system interpreter is externally-managed, so some venv is required
+either way)
 
 The suite builds synthetic logs with known contents — a tone that filtering
 removes, a sweep through a known transport delay — so it runs without any
 flight data and the assertions have a ground truth to check against.
+
+[`AGENTS.md`](AGENTS.md) is the working brief: the architectural rule that
+keeps analysis and rendering apart, and the traps that have produced wrong
+answers before.
+
+## Documentation
+
+| | |
+|---|---|
+| [docs/recording.md](docs/recording.md) | How to record a log worth analysing |
+| [docs/firmware.md](docs/firmware.md) | What real flight logs confirmed about the firmware |
+| [docs/reference/](docs/reference/) | The upstream facts this tool relies on, pinned to Betaflight and blackbox-tools commits |
+
+The reference pages are checked against specific upstream revisions rather
+than remembered, and `python scripts/fetch_upstream.py --check` reports when
+one of those revisions has moved.
 
 ## Layout
 
@@ -167,4 +188,5 @@ flight data and the assertions have a ground truth to check against.
 
 ## Licence
 
-MIT.
+GNU General Public License v3.0 or later, the same licence Betaflight uses.
+See [LICENSE](LICENSE).

@@ -1,3 +1,20 @@
+# This file is part of bfchirp.
+#
+# Copyright (C) 2026 Cedric
+#
+# bfchirp is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# bfchirp is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+
 """Plain-text rendering of the analysis results.
 
 Every table is written to be read without a manual: units are on the figures,
@@ -256,8 +273,11 @@ def _report_motor_load(result: ChirpResult, out) -> None:
     out("    ripple, so the low end of the sweep is its most demanding part.")
     if load.get("feedforward_active"):
         out("    ! FEEDFORWARD WAS ACTIVE during this sweep. Its output grows with")
-        out("      frequency and the lead/lag does not bound it — set ff_weight to 0")
-        out("      before widening the sweep.")
+        out("      frequency and the lead/lag does not bound it. Zero the F terms")
+        # ff_weight is the blackbox header key, not a CLI setting: the settings
+        # are the per-axis F gains. Naming the header key here sent people to a
+        # 'set' command that does not exist.
+        out("      (set f_roll / f_pitch / f_yaw = 0) before widening the sweep.")
     else:
         out("    feedforward is off: the precondition for widening the sweep is met.")
     out("")

@@ -1,0 +1,82 @@
+# docs/reference/ is only trustworthy while its pins still match upstream.
+# Drift arrives on Betaflight's schedule rather than ours, so check on a timer
+# rather than waiting for someone to remember.
+name: Upstream drift
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Check pinned upstream sources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      # fetch_upstream.py is standard library only: nothing to install.
+      - name: Check for drift
+        id: check
+        run: |
+          if python scripts/fetch_upstream.py --check > drift.log 2>&1; then
+            echo "drifted=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drifted=true" >> "$GITHUB_OUTPUT"
+          fi
+          cat drift.log
+
+      # Built line by line rather than with a heredoc: inside a YAML block
+      # scalar a heredoc keeps its indentation, which markdown would render as
+      # one big code block. Single quotes where backticks appear, so the shell
+      # does not try to execute them.
+      - name: Report drift
+        if: steps.check.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo 'The `--check` run reports that at least one pinned file no longer'
+            echo 'matches upstream `master`.'
+            echo
+            echo '```'
+            cat drift.log
+            echo '```'
+            echo
+            echo '**Read the changed file before updating anything.** The affected page'
+            echo 'in `docs/reference/` may still be correct, may need a correction, or'
+            echo 'may have been quietly wrong since the change landed, and only reading'
+            echo 'settles which. Bump `commit` and `checked` in'
+            echo '`scripts/upstream_sources.json` afterwards, never before: doing it'
+            echo 'first turns a caught problem into a hidden one.'
+            echo
+            echo 'The full procedure is step 2 of "Checking your work" in `AGENTS.md`.'
+            echo
+            echo '_Opened automatically by `.github/workflows/upstream-drift.yml`._'
+          } > issue-body.md
+
+          gh label create upstream-drift \
+            --color d93f0b \
+            --description "A pinned upstream source has changed" 2>/dev/null || true
+
+          # Comment on the standing issue rather than opening a new one each week.
+          existing=$(gh issue list --label upstream-drift --state open \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file issue-body.md
+          else
+            gh issue create \
+              --title "Upstream drift: a pinned source has changed" \
+              --label upstream-drift \
+              --body-file issue-body.md
+          fi
